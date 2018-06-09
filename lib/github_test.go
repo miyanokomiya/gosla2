@@ -38,3 +38,27 @@ func TestFindAccounts(t *testing.T) {
 		t.Fatal("get invalid account")
 	}
 }
+
+func TestReplaceComment(t *testing.T) {
+	accounts := map[string]Account{
+		"@a": Account{
+			ID:      "@aa",
+			Channel: "aaa",
+		},
+		"@b": Account{
+			ID:      "@bb",
+			Channel: "bbb",
+		},
+	}
+	table := map[string]string{
+		"@a abcd":      "<@aa> abcd",
+		"abcd @a abcd": "abcd <@aa> abcd",
+		"abcd @b abcd": "abcd <@bb> abcd",
+	}
+	for from, to := range table {
+		result := ReplaceComment(from, accounts)
+		if result != to {
+			t.Fatal("get invalid text", "\nfrom: "+from, "\nexpected: "+to, "\nactual: "+result)
+		}
+	}
+}

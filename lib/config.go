@@ -1,39 +1,26 @@
 package lib
 
 import (
-	"encoding/json"
-	"io/ioutil"
+	"github.com/BurntSushi/toml"
 )
 
 // Config GithubとSlackの連携情報を格納する構造体
 type Config struct {
-	Accounts     map[string]Account `json:"accounts"`
-	Repositories map[string]string  `json:"repositories"`
+	Accounts map[string]Account `toml:"accounts"`
 }
 
 // Account Slackアカウント情報
 type Account struct {
-	ID      string `json:"id"`
-	Channel string `json:"channel"`
+	ID      string `toml:"id"`
+	Channel string `toml:"channel"`
 }
 
-// ParseFile 設定ファイルをパースする関数
-func ParseFile(filename string) (*Config, error) {
+// ParseConfigFile 設定ファイルをパースする関数
+func ParseConfigFile(filename string) (*Config, error) {
 	c := Config{}
-
-	jsonString, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(jsonString, &c)
+	_, err := toml.DecodeFile(filename, &c)
 	if err != nil {
 		return nil, err
 	}
 	return &c, nil
-}
-
-// GetEndPoint Slack投稿先を取得する関数
-func GetEndPoint(repositoryName string, conf *Config) string {
-	endPoint, _ := conf.Repositories[repositoryName]
-	return endPoint
 }

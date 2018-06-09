@@ -3,13 +3,14 @@ package lib
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
-// SendToSlack Slackへのメッセージ送信
-func SendToSlack(path string, text string) (string, error) {
+// sendToSlack Slackへのメッセージ送信
+func sendToSlack(path string, text string) (string, error) {
 	slackURL := "https://hooks.slack.com"
 	slackPath := path
 	u, _ := url.ParseRequestURI(slackURL)
@@ -33,7 +34,25 @@ func SendToSlack(path string, text string) (string, error) {
 	return string(b), nil
 }
 
-// CreateHeaderLine メッセージのヘッダ部分作成
-func CreateHeaderLine(emoji string, repositoryName string, title string) string {
-	return fmt.Sprintf("%v *[%v] %v*\n", emoji, repositoryName, title)
+// CreatePostText 投稿用テキストを生成する
+func CreatePostText(summary EventSummary) string {
+	text := fmt.Sprintf("*[%v] %v*", summary.RepositoryName, summary.Title)
+	text = fmt.Sprintf("%v\n%v", text, summary.URL)
+	text = fmt.Sprintf("%v\n> %v", text, summary.Description)
+	text = fmt.Sprintf("%v\n%v", text, summary.Comment)
+	return text
+}
+
+// PostToAccounts Slackアカウント宛に送信
+// 送信エラーは無視して続行
+func PostToAccounts(text string, accounts map[string]Account) {
+	for key, account := range accounts {
+		log.Println("start: send to Slack: " + key + ", channel: " + account.Channel)
+		_, err := sendToSlack(account.Channel, text)
+		if err != nil {
+			log.Println("failed: send to Slack: "+key, err)
+		} else {
+			log.Println("success: send to Slack: " + key)
+		}
+	}
 }
