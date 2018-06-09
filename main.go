@@ -22,6 +22,7 @@ func main() {
 	api := rest.NewApi()
 	api.Use(rest.DefaultDevStack...)
 	router, err := rest.MakeRouter(
+		rest.Get("/", home),
 		rest.Post("/github/events", PostGithubEvents),
 	)
 	if err != nil {
@@ -29,6 +30,10 @@ func main() {
 	}
 	api.SetApp(router)
 	log.Fatal(http.ListenAndServe(":"+port, api.MakeHandler()))
+}
+
+func home(w rest.ResponseWriter, r *rest.Request) {
+	w.WriteJson(`{"res": "Hello!"}`)
 }
 
 // PostGithubEvents Githubイベント連携関数
