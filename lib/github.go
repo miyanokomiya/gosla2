@@ -48,56 +48,30 @@ type EventSummary struct {
 }
 
 // ParseHook Githubのリクエストをパースする関数
-func ParseHook(req *rest.Request) (HookContext, error) {
-	hc := HookContext{}
+func (hc *HookContext) ParseHook(req *rest.Request) error {
 	secret := []byte(key)
 	if hc.Signature = req.Header.Get("x-hub-signature"); len(hc.Signature) == 0 {
-		return hc, ErrNotSignature
+		return ErrNotSignature
 	}
 	if hc.Event = req.Header.Get("x-github-event"); len(hc.Event) == 0 {
-		return hc, ErrNotEvent
+		return ErrNotEvent
 	}
 	if hc.ID = req.Header.Get("x-github-delivery"); len(hc.ID) == 0 {
-		return hc, ErrNotEventID
+		return ErrNotEventID
 	}
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return hc, err
+		return err
 	}
 	defer req.Body.Close()
 	if !verifySignature(secret, hc.Signature, body) {
-		return hc, ErrInvalidSignature
+		return ErrInvalidSignature
 	}
 	if len(body) == 0 {
-		return hc, ErrEmptyPayload
+		return ErrEmptyPayload
 	}
 	hc.Payload = body
-	return hc, nil
-}
-
-// FindAccounts コメントに含まれるメンションに対応するアカウント情報一覧を取得する
-func FindAccounts(comment string, conf *Config) map[string]Account {
-	accounts := map[string]Account{}
-	matches := r.FindAllStringSubmatch(comment, -1)
-	for _, val := range matches {
-		hit := val[0]
-		if account, ok := conf.Accounts[hit]; ok {
-			accounts[hit] = account
-		}
-	}
-	return accounts
-}
-
-// ReplaceComment コメント内のアカウント情報を置き換える関数
-func ReplaceComment(comment string, accounts map[string]Account) string {
-	replaced := comment
-	matches := r.FindAllStringSubmatch(comment, -1)
-	for _, val := range matches {
-		if account, ok := accounts[val[0]]; ok {
-			replaced = strings.Replace(replaced, val[0], "<"+account.ID+">", -1)
-		}
-	}
-	return replaced
+	return nil
 }
 
 // secretキー検証
@@ -122,94 +96,113 @@ func signBody(secret, body []byte) []byte {
 	return []byte(computed.Sum(nil))
 }
 
+// FindAccounts コメントに含まれるメンションに対応するアカウント情報一覧を取得する
+func FindAccounts(comment string, conf *Config) map[string]Account {
+	accounts := map[string]Account{}
+	matches := r.FindAllStringSubmatch(comment, -1)
+	for _, val := range matches {
+		hit := val[0]
+		if account, ok := conf.Accounts[hit]; ok {
+			accounts[hit] = account
+		}
+	}
+	return accounts
+}
+
+// ReplaceComment コメント内のアカウント情報を置き換える関数
+func (summary *EventSummary) ReplaceComment(accounts map[string]Account) {
+	matches := r.FindAllStringSubmatch(summary.Comment, -1)
+	for _, val := range matches {
+		if account, ok := accounts[val[0]]; ok {
+			summary.Comment = strings.Replace(summary.Comment, val[0], "<"+account.ID+">", -1)
+		}
+	}
+}
+
 // parseIssuesEvent issuesイベントをパースする
-func parseIssuesEvent(hc HookContext) (EventSummary, error) {
-	summary := EventSummary{}
+func (summary *EventSummary) parseIssuesEvent(hc HookContext) error {
 	evt := github.IssuesEvent{}
 	err := json.Unmarshal(hc.Payload, &evt)
 	if err != nil {
-		return summary, err
+		return err
 	}
 	if *evt.Action != "opened" && *evt.Action != "edited" {
-		return summary, ErrUnhandledAction
+		return ErrUnhandledAction
 	}
 	summary.RepositoryName = *evt.Repo.Name
 	summary.Title = *evt.Issue.Title
 	summary.URL = *evt.Issue.HTMLURL
 	summary.Description = fmt.Sprintf("Issue %v by: %v", *evt.Action, *evt.Issue.User.Login)
 	summary.Comment = *evt.Issue.Body
-	return summary, nil
+	return nil
 }
 
 // parseIssueCommentsEvent issue_commentイベントをパースする
-func parseIssueCommentsEvent(hc HookContext) (EventSummary, error) {
-	summary := EventSummary{}
+func (summary *EventSummary) parseIssueCommentsEvent(hc HookContext) error {
 	evt := github.IssueCommentEvent{}
 	err := json.Unmarshal(hc.Payload, &evt)
 	if err != nil {
-		return summary, err
+		return err
 	}
 	if *evt.Action != "created" && *evt.Action != "edited" {
-		return summary, ErrUnhandledAction
+		return ErrUnhandledAction
 	}
 	summary.RepositoryName = *evt.Repo.Name
 	summary.Title = *evt.Issue.Title
 	summary.URL = *evt.Comment.HTMLURL
 	summary.Description = fmt.Sprintf("Comment %v by: %v", *evt.Action, *evt.Comment.User.Login)
 	summary.Comment = *evt.Comment.Body
-	return summary, nil
+	return nil
 }
 
 // parsePullRequestEvent pull_requestイベントをパースする
-func parsePullRequestEvent(hc HookContext) (EventSummary, error) {
-	summary := EventSummary{}
+func (summary *EventSummary) parsePullRequestEvent(hc HookContext) error {
 	evt := github.PullRequestEvent{}
 	err := json.Unmarshal(hc.Payload, &evt)
 	if err != nil {
-		return summary, err
+		return err
 	}
 	if *evt.Action != "opened" && *evt.Action != "edited" {
-		return summary, ErrUnhandledAction
+		return ErrUnhandledAction
 	}
 	summary.RepositoryName = *evt.Repo.Name
 	summary.Title = *evt.PullRequest.Title
 	summary.URL = *evt.PullRequest.HTMLURL
 	summary.Description = fmt.Sprintf("Comment %v by: %v", *evt.Action, *evt.PullRequest.User.Login)
 	summary.Comment = *evt.PullRequest.Body
-	return summary, nil
+	return nil
 }
 
 // parsePullRequestReviewCommentEvent pull_request_review_commentイベントをパースする
-func parsePullRequestReviewCommentEvent(hc HookContext) (EventSummary, error) {
-	summary := EventSummary{}
+func (summary *EventSummary) parsePullRequestReviewCommentEvent(hc HookContext) error {
 	evt := github.PullRequestReviewCommentEvent{}
 	err := json.Unmarshal(hc.Payload, &evt)
 	if err != nil {
-		return summary, err
+		return err
 	}
 	if *evt.Action != "opened" && *evt.Action != "edited" {
-		return summary, ErrUnhandledAction
+		return ErrUnhandledAction
 	}
 	summary.RepositoryName = *evt.Repo.Name
 	summary.Title = *evt.PullRequest.Title
 	summary.URL = *evt.Comment.HTMLURL
 	summary.Description = fmt.Sprintf("Comment %v by: %v", *evt.Action, *evt.Comment.User.Login)
 	summary.Comment = *evt.Comment.Body
-	return summary, nil
+	return nil
 }
 
-// CreateEventSummary githubイベントサマリ生成
-func CreateEventSummary(hc HookContext) (EventSummary, error) {
+// ParseEventSummary githubイベントサマリ生成
+func (summary *EventSummary) ParseEventSummary(hc HookContext) error {
 	switch hc.Event {
 	case "issues":
-		return parseIssuesEvent(hc)
+		return summary.parseIssuesEvent(hc)
 	case "issue_comment":
-		return parseIssueCommentsEvent(hc)
+		return summary.parseIssueCommentsEvent(hc)
 	case "pull_request":
-		return parsePullRequestEvent(hc)
+		return summary.parsePullRequestEvent(hc)
 	case "pull_request_review_comment":
-		return parsePullRequestReviewCommentEvent(hc)
+		return summary.parsePullRequestReviewCommentEvent(hc)
 	default:
-		return EventSummary{}, ErrUnhandledEvent
+		return ErrUnhandledEvent
 	}
 }

@@ -37,13 +37,15 @@ func root(w rest.ResponseWriter, r *rest.Request) {
 
 // postGithubEvents Githubイベント連携関数
 func postGithubEvents(w rest.ResponseWriter, r *rest.Request) {
-	hc, err := lib.ParseHook(r)
+	hc := lib.HookContext{}
+	err := hc.ParseHook(r)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	summary, err := lib.CreateEventSummary(hc)
+	summary := lib.EventSummary{}
+	err = summary.ParseEventSummary(hc)
 	if err == lib.ErrUnhandledEvent || err == lib.ErrUnhandledAction {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -60,7 +62,7 @@ func postGithubEvents(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	accounts := lib.FindAccounts(summary.Comment, conf)
-	summary.Comment = lib.ReplaceComment(summary.Comment, accounts)
+	summary.ReplaceComment(accounts)
 	text := lib.CreatePostText(summary)
 	lib.PostToAccounts(text, accounts)
 	w.WriteJson(`{"res": "finished"}`)

@@ -56,9 +56,12 @@ func TestReplaceComment(t *testing.T) {
 		"abcd @b abcd": "abcd <@bb> abcd",
 	}
 	for from, to := range table {
-		result := ReplaceComment(from, accounts)
-		if result != to {
-			t.Fatal("get invalid text", "\nfrom: "+from, "\nexpected: "+to, "\nactual: "+result)
+		summary := EventSummary{
+			Comment: from,
+		}
+		summary.ReplaceComment(accounts)
+		if summary.Comment != to {
+			t.Fatal("get invalid text", "\nfrom: "+from, "\nexpected: "+to, "\nactual: "+summary.Comment)
 		}
 	}
 }
