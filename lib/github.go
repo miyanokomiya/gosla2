@@ -92,7 +92,7 @@ func signBody(secret, body []byte) []byte {
 }
 
 // FindAccounts コメントに含まれるメンションに対応するアカウント情報一覧を取得する
-func FindAccounts(comment string, conf *Config) map[string]Account {
+func FindAccounts(comment string, conf Config) map[string]Account {
 	accounts := map[string]Account{}
 	matches := mentionReg.FindAllStringSubmatch(comment, -1)
 	for _, val := range matches {
@@ -112,9 +112,9 @@ func (summary *EventSummary) ReplaceComment(accounts map[string]Account) {
 }
 
 // parseIssuesEvent issuesイベントをパースする
-func (summary *EventSummary) parseIssuesEvent(hc HookContext) error {
+func (summary *EventSummary) parseIssuesEvent(payload []byte) error {
 	evt := github.IssuesEvent{}
-	err := json.Unmarshal(hc.Payload, &evt)
+	err := json.Unmarshal(payload, &evt)
 	if err != nil {
 		return err
 	}
@@ -130,9 +130,9 @@ func (summary *EventSummary) parseIssuesEvent(hc HookContext) error {
 }
 
 // parseIssueCommentsEvent issue_commentイベントをパースする
-func (summary *EventSummary) parseIssueCommentsEvent(hc HookContext) error {
+func (summary *EventSummary) parseIssueCommentsEvent(payload []byte) error {
 	evt := github.IssueCommentEvent{}
-	err := json.Unmarshal(hc.Payload, &evt)
+	err := json.Unmarshal(payload, &evt)
 	if err != nil {
 		return err
 	}
@@ -148,9 +148,9 @@ func (summary *EventSummary) parseIssueCommentsEvent(hc HookContext) error {
 }
 
 // parsePullRequestEvent pull_requestイベントをパースする
-func (summary *EventSummary) parsePullRequestEvent(hc HookContext) error {
+func (summary *EventSummary) parsePullRequestEvent(payload []byte) error {
 	evt := github.PullRequestEvent{}
-	err := json.Unmarshal(hc.Payload, &evt)
+	err := json.Unmarshal(payload, &evt)
 	if err != nil {
 		return err
 	}
@@ -160,15 +160,15 @@ func (summary *EventSummary) parsePullRequestEvent(hc HookContext) error {
 	summary.RepositoryName = *evt.Repo.Name
 	summary.Title = *evt.PullRequest.Title
 	summary.URL = *evt.PullRequest.HTMLURL
-	summary.Description = fmt.Sprintf("Comment %v by: %v", *evt.Action, *evt.PullRequest.User.Login)
+	summary.Description = fmt.Sprintf("PullRequest %v by: %v", *evt.Action, *evt.PullRequest.User.Login)
 	summary.Comment = *evt.PullRequest.Body
 	return nil
 }
 
 // parsePullRequestReviewEvent pull_request_reviewイベントをパースする
-func (summary *EventSummary) parsePullRequestReviewEvent(hc HookContext) error {
+func (summary *EventSummary) parsePullRequestReviewEvent(payload []byte) error {
 	evt := github.PullRequestReviewEvent{}
-	err := json.Unmarshal(hc.Payload, &evt)
+	err := json.Unmarshal(payload, &evt)
 	if err != nil {
 		return err
 	}
@@ -186,9 +186,9 @@ func (summary *EventSummary) parsePullRequestReviewEvent(hc HookContext) error {
 }
 
 // parsePullRequestReviewCommentEvent pull_request_review_commentイベントをパースする
-func (summary *EventSummary) parsePullRequestReviewCommentEvent(hc HookContext) error {
+func (summary *EventSummary) parsePullRequestReviewCommentEvent(payload []byte) error {
 	evt := github.PullRequestReviewCommentEvent{}
-	err := json.Unmarshal(hc.Payload, &evt)
+	err := json.Unmarshal(payload, &evt)
 	if err != nil {
 		return err
 	}
@@ -207,15 +207,15 @@ func (summary *EventSummary) parsePullRequestReviewCommentEvent(hc HookContext) 
 func (summary *EventSummary) ParseEventSummary(hc HookContext) error {
 	switch hc.Event {
 	case "issues":
-		return summary.parseIssuesEvent(hc)
+		return summary.parseIssuesEvent(hc.Payload)
 	case "issue_comment":
-		return summary.parseIssueCommentsEvent(hc)
+		return summary.parseIssueCommentsEvent(hc.Payload)
 	case "pull_request":
-		return summary.parsePullRequestEvent(hc)
+		return summary.parsePullRequestEvent(hc.Payload)
 	case "pull_request_review":
-		return summary.parsePullRequestReviewEvent(hc)
+		return summary.parsePullRequestReviewEvent(hc.Payload)
 	case "pull_request_review_comment":
-		return summary.parsePullRequestReviewCommentEvent(hc)
+		return summary.parsePullRequestReviewCommentEvent(hc.Payload)
 	default:
 		return ErrUnhandledEvent
 	}

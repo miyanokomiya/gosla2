@@ -16,12 +16,11 @@ type Account struct {
 	Channel string `toml:"channel"`
 }
 
-// ParseConfigFile 設定ファイルをパースする関数
-func ParseConfigFile(filename string) (*Config, error) {
-	c := Config{}
+// ParseFile 設定ファイルをパースする関数
+func (c *Config) ParseFile(filename string) error {
 	_, err := toml.DecodeFile(filename, &c)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &c, nil
+	return nil
 }
