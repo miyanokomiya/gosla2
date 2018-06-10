@@ -23,9 +23,7 @@ type HookContext struct {
 	Payload   []byte
 }
 
-const key = "miyanokomiya"
-
-var r = regexp.MustCompile(`@[a-zA-Z0-9_\-]+`)
+var mentionReg = regexp.MustCompile(`@[a-zA-Z0-9_\-]+`)
 
 // error定義まとめ
 var (
@@ -48,8 +46,7 @@ type EventSummary struct {
 }
 
 // ParseHook Githubのリクエストをパースする関数
-func (hc *HookContext) ParseHook(req *rest.Request) error {
-	secret := []byte(key)
+func (hc *HookContext) ParseHook(req *rest.Request, secret string) error {
 	if hc.Signature = req.Header.Get("x-hub-signature"); len(hc.Signature) == 0 {
 		return ErrNotSignature
 	}
@@ -64,7 +61,7 @@ func (hc *HookContext) ParseHook(req *rest.Request) error {
 		return err
 	}
 	defer req.Body.Close()
-	if !verifySignature(secret, hc.Signature, body) {
+	if !verifySignature([]byte(secret), hc.Signature, body) {
 		return ErrInvalidSignature
 	}
 	if len(body) == 0 {
@@ -76,10 +73,8 @@ func (hc *HookContext) ParseHook(req *rest.Request) error {
 
 // secretキー検証
 func verifySignature(secret []byte, signature string, body []byte) bool {
-
 	const signaturePrefix = "sha1="
 	const signatureLength = 45 // len(SignaturePrefix) + len(hex(sha1))
-
 	if len(signature) != signatureLength || !strings.HasPrefix(signature, signaturePrefix) {
 		return false
 	}
@@ -99,7 +94,7 @@ func signBody(secret, body []byte) []byte {
 // FindAccounts コメントに含まれるメンションに対応するアカウント情報一覧を取得する
 func FindAccounts(comment string, conf *Config) map[string]Account {
 	accounts := map[string]Account{}
-	matches := r.FindAllStringSubmatch(comment, -1)
+	matches := mentionReg.FindAllStringSubmatch(comment, -1)
 	for _, val := range matches {
 		hit := val[0]
 		if account, ok := conf.Accounts[hit]; ok {
@@ -111,11 +106,8 @@ func FindAccounts(comment string, conf *Config) map[string]Account {
 
 // ReplaceComment コメント内のアカウント情報を置き換える関数
 func (summary *EventSummary) ReplaceComment(accounts map[string]Account) {
-	matches := r.FindAllStringSubmatch(summary.Comment, -1)
-	for _, val := range matches {
-		if account, ok := accounts[val[0]]; ok {
-			summary.Comment = strings.Replace(summary.Comment, val[0], "<"+account.ID+">", -1)
-		}
+	for key, account := range accounts {
+		summary.Comment = strings.Replace(summary.Comment, key, "<"+account.ID+">", -1)
 	}
 }
 
@@ -173,6 +165,26 @@ func (summary *EventSummary) parsePullRequestEvent(hc HookContext) error {
 	return nil
 }
 
+// parsePullRequestReviewEvent pull_request_reviewイベントをパースする
+func (summary *EventSummary) parsePullRequestReviewEvent(hc HookContext) error {
+	evt := github.PullRequestReviewEvent{}
+	err := json.Unmarshal(hc.Payload, &evt)
+	if err != nil {
+		return err
+	}
+	// コードコメントを含んだレビューのサブミットを行うと submitted と edited 両方がイベントとして投げられる
+	// -> github側がそうなっているので仕方ない
+	if *evt.Action != "submitted" && *evt.Action != "edited" {
+		return ErrUnhandledAction
+	}
+	summary.RepositoryName = *evt.Repo.Name
+	summary.Title = *evt.PullRequest.Title
+	summary.URL = *evt.Review.HTMLURL
+	summary.Description = fmt.Sprintf("Review %v by: %v", *evt.Action, *evt.Review.User.Login)
+	summary.Comment = *evt.Review.Body
+	return nil
+}
+
 // parsePullRequestReviewCommentEvent pull_request_review_commentイベントをパースする
 func (summary *EventSummary) parsePullRequestReviewCommentEvent(hc HookContext) error {
 	evt := github.PullRequestReviewCommentEvent{}
@@ -180,7 +192,7 @@ func (summary *EventSummary) parsePullRequestReviewCommentEvent(hc HookContext) 
 	if err != nil {
 		return err
 	}
-	if *evt.Action != "opened" && *evt.Action != "edited" {
+	if *evt.Action != "created" && *evt.Action != "edited" {
 		return ErrUnhandledAction
 	}
 	summary.RepositoryName = *evt.Repo.Name
@@ -200,6 +212,8 @@ func (summary *EventSummary) ParseEventSummary(hc HookContext) error {
 		return summary.parseIssueCommentsEvent(hc)
 	case "pull_request":
 		return summary.parsePullRequestEvent(hc)
+	case "pull_request_review":
+		return summary.parsePullRequestReviewEvent(hc)
 	case "pull_request_review_comment":
 		return summary.parsePullRequestReviewCommentEvent(hc)
 	default:

@@ -1,3 +1,7 @@
+# github-webhookのシークレットキー
+secret = "miyanokomiya"
+
+# githubのIDをキー、SlackのIDとポスト先チャンネルをバリューとしたハッシュ
 [accounts."@miyanokomiya"]
 id = "@UB54ALKE2"
 channel = "services/TB47J15TL/BB3GJ9VDW/CmhxPmT7dasuQ8SVu1tUvSiq"

@@ -9,21 +9,21 @@ import (
 	"strings"
 )
 
+var slackURL = "https://hooks.slack.com"
+var contentType = "application/x-www-form-urlencoded"
+
 // sendToSlack Slackへのメッセージ送信
 func sendToSlack(path string, text string) (string, error) {
-	slackURL := "https://hooks.slack.com"
-	slackPath := path
 	u, _ := url.ParseRequestURI(slackURL)
-	u.Path = slackPath
-
-	urlStr := fmt.Sprintf("%v", u)
+	u.Path = path
+	urlStr := u.String()
 
 	data := url.Values{}
 	data.Set("payload", "{\"text\": \""+text+"\"}")
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("POST", urlStr, strings.NewReader(data.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", contentType)
 
 	res, err := client.Do(req)
 	if err != nil {

@@ -37,8 +37,14 @@ func root(w rest.ResponseWriter, r *rest.Request) {
 
 // postGithubEvents Githubイベント連携関数
 func postGithubEvents(w rest.ResponseWriter, r *rest.Request) {
+	conf, err := lib.ParseConfigFile("./config.toml")
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	hc := lib.HookContext{}
-	err := hc.ParseHook(r)
+	err = hc.ParseHook(r, conf.Secret)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -50,12 +56,6 @@ func postGithubEvents(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	conf, err := lib.ParseConfigFile("./config.toml")
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -6,6 +6,7 @@ import (
 
 // Config GithubとSlackの連携情報を格納する構造体
 type Config struct {
+	Secret   string             `toml:"secret"`
 	Accounts map[string]Account `toml:"accounts"`
 }
 
