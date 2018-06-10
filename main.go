@@ -9,6 +9,7 @@ import (
 	"github.com/miyanokomiya/gosla2/lib"
 )
 
+// test
 func main() {
 	// Heroku環境を考慮してポートを取得
 	port := os.Getenv("PORT")
